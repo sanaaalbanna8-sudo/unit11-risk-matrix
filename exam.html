@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>امتحان تقييم المخاطر | وحدة 11</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { cairo: ["Cairo", "Tajawal", "Tahoma", "sans-serif"] } } }
+    };
+  </script>
+  <style>
+    body {
+      font-family: "Cairo", "Tajawal", Tahoma, sans-serif;
+      min-height: 100vh;
+      color: #e8eef7;
+      background:
+        radial-gradient(920px 520px at 100% -12%, rgba(34, 211, 238, 0.16), transparent 52%),
+        radial-gradient(780px 460px at -8% 108%, rgba(16, 185, 129, 0.13), transparent 48%),
+        radial-gradient(640px 380px at 50% 120%, rgba(59, 130, 246, 0.14), transparent 42%),
+        #070b12;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(148, 163, 184, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.045) 1px, transparent 1px);
+      background-size: 46px 46px;
+      mask-image: radial-gradient(circle at 50% 20%, #000 20%, transparent 78%);
+    }
+    .num { direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-nums; }
+    button, input, textarea, select { font: inherit; }
+    legend { padding: 0; }
+    .cell {
+      border-width: 1px;
+      border-style: solid;
+      border-radius: 14px;
+      min-height: 68px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+    .cell.compact { min-height: 0; transform: none !important; animation: none; }
+    .tone-low { background: rgba(16, 185, 129, 0.12); color: #d1fae5; border-color: rgba(52, 211, 153, 0.32); }
+    .tone-medium { background: rgba(250, 204, 21, 0.13); color: #fef9c3; border-color: rgba(250, 204, 21, 0.38); }
+    .tone-high { background: rgba(249, 115, 22, 0.15); color: #ffedd5; border-color: rgba(251, 146, 60, 0.4); }
+    .tone-critical { background: rgba(248, 113, 113, 0.16); color: #fee2e2; border-color: rgba(248, 113, 113, 0.42); }
+    .tone-low.is-on { background: rgba(16, 185, 129, 0.42); color: #fff; border-color: #6ee7b7; box-shadow: 0 0 28px rgba(52, 211, 153, 0.45); transform: scale(1.04); }
+    .tone-medium.is-on { background: rgba(250, 204, 21, 0.42); color: #1c1403; border-color: #fde68a; box-shadow: 0 0 28px rgba(250, 204, 21, 0.45); transform: scale(1.04); }
+    .tone-high.is-on { background: rgba(249, 115, 22, 0.5); color: #fff; border-color: #fdba74; box-shadow: 0 0 28px rgba(249, 115, 22, 0.45); transform: scale(1.04); }
+    .tone-critical.is-on { background: rgba(239, 68, 68, 0.55); color: #fff; border-color: #fca5a5; box-shadow: 0 0 32px rgba(248, 113, 113, 0.5); transform: scale(1.04); }
+    .is-on { animation: cellglow 1.7s ease-in-out infinite; }
+    .is-answer { outline: 2px solid #fff; outline-offset: 2px; }
+    .is-miss { outline: 2px dashed #67e8f9; outline-offset: 2px; }
+    .axis-hot { box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.45); }
+    @keyframes cellglow { 50% { filter: brightness(1.12); } }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .rise { animation: rise 0.35s ease both; }
+    @media (prefers-reduced-motion: reduce) {
+      .is-on, .rise { animation: none; }
+      .cell { transition: none; }
+    }
+    @media print {
+      body { background: #fff; color: #111; }
+      body::before { display: none; }
+      .no-print { display: none !important; }
+      .print-sheet { break-inside: avoid; background: #fff !important; color: #111 !important; border-color: #ddd !important; }
+    }
+  </style>
+</head>
+<body class="font-cairo">
+  <div id="app" class="relative mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8"></div>
+  <script>
+    const LIKELIHOODS = [
+      { id: "very", ar: "محتمل جداً", en: "Very likely" },
+      { id: "possible", ar: "محتمل", en: "Likely" },
+      { id: "unlikely", ar: "غير محتمل", en: "Unlikely" }
+    ];
+    const IMPACTS = [
+      { id: "minor", ar: "طفيفة", en: "Minor" },
+      { id: "moderate", ar: "معتدلة", en: "Moderate" },
+      { id: "major", ar: "كبيرة", en: "Major" }
+    ];
+    const SEVERITIES = [
+      { id: "low", ar: "منخفض", en: "Low", tone: "low", swatch: "أخضر" },
+      { id: "medium", ar: "متوسط", en: "Medium", tone: "medium", swatch: "أصفر" },
+      { id: "high", ar: "مرتفع", en: "High", tone: "high", swatch: "برتقالي" },
+      { id: "critical", ar: "شديد", en: "Critical", tone: "critical", swatch: "أحمر" }
+    ];
+    const MATRIX = {
+      very:     { minor: "medium", moderate: "high",   major: "critical" },
+      possible: { minor: "low",    moderate: "medium", major: "high" },
+      unlikely: { minor: "low",    moderate: "low",    major: "medium" }
+    };
+
+    const QUESTIONS = [
+      {
+        title: "مجلد رواتب مفتوح للتعديل أمام الجميع",
+        asset: "ملفات الرواتب الحالية",
+        text: "على الخادم مجلد باسم «مشترك للجميع» وصلاحية التعديل ممنوحة لكل الموظفين. داخله ملفات رواتب هذا الشهر، والموظفون يفتحون المجلد كل يوم ليضعوا فيه ملفات أخرى.",
+        likelihood: "very",
+        impact: "major",
+        why: "الفتح يومي والصلاحية واسعة، والملف نفسه رواتب حالية. محتمل جدًا × كبيرة = شديد."
+      },
+      {
+        title: "المتصفح يغلق على الموقع العام",
+        asset: "حصة المختبر",
+        text: "في المختبر يغلق المتصفح فجأة عدة مرات كل حصة بينما الطالبات على الموقع العام. لا كلمات مرور ولا درجات على هذه الأجهزة. تُعاد فتح الصفحة وتكمل الحصة، وشبكة المؤسسة تبقى تعمل.",
+        likelihood: "very",
+        impact: "minor",
+        why: "التكرار عالٍ والأثر إزعاج لحظي بلا فقد بيانات. محتمل جدًا × طفيفة = متوسط."
+      },
+      {
+        title: "النسخة الوحيدة بجانب الجهاز الأصلي",
+        asset: "السجلات الدراسية المعتمدة",
+        text: "نسخة واحدة من السجلات الدراسية تُحفظ على قرص في غرفة الخادم نفسها. لم تُجرَّب الاستعادة منذ سنة. تعطل القرصين معًا خلال العام وارد، وعندها تُفقد السجلات المعتمدة.",
+        likelihood: "possible",
+        impact: "major",
+        why: "التعطل وارد وليس حدثًا يوميًا، والأثر فقد السجل المعتمد. محتمل × كبيرة = مرتفع."
+      },
+      {
+        title: "دفتر أسماء عند الاستقبال",
+        asset: "اسم الزائر ووقت دخوله",
+        text: "دفتر ورقي يُكتب فيه اسم الزائر ووقت الدخول فقط، ويُترك أحيانًا مفتوحًا على المكتب. لا أرقام هواتف ولا أرقام وطنية ولا سبب الزيارة.",
+        likelihood: "possible",
+        impact: "minor",
+        why: "الاطلاع ممكن، والمعلومة اسم ووقت فقط. محتمل × طفيفة = منخفض."
+      },
+      {
+        title: "أرقام الهواتف على البريد الشخصي",
+        asset: "أرقام هواتف الزميلات",
+        text: "ترسل الموظفات كل يوم قائمة أرقام هواتف الزميلات إلى بريدهن الشخصي ليُكملن العمل مساءً. البريد الشخصي بلا حماية إضافية. القائمة بلا رواتب ولا كلمات مرور.",
+        likelihood: "very",
+        impact: "moderate",
+        why: "السلوك يومي، والأثر انكشاف بيانات اتصال لا إيقاف المؤسسة. محتمل جدًا × معتدلة = مرتفع."
+      },
+      {
+        title: "حريق في غرفة محمية ومختبَرة",
+        asset: "نظام إصدار النتائج",
+        text: "غرفة الخوادم في الطابق الأعلى، وفيها إطفاء مبكر يُختبر، ولا حريق مسجّل في المبنى منذ إنشائه. نظام النتائج يعمل من هذه الغرفة فقط. لو احترقت الغرفة لتوقف إصدار النتائج.",
+        likelihood: "unlikely",
+        impact: "major",
+        why: "الأثر كبير لو وقع الحريق، والوقاية والسجل يجعلان الاحتمال ضعيفًا. غير محتمل × كبيرة = متوسط."
+      },
+      {
+        title: "مخزن مفتوح وفيه صور وثائق الهوية",
+        asset: "صور وثائق الهوية",
+        text: "باب المخزن يبقى مفتوحًا طوال الدوام، والكاميرا معطلة منذ أشهر. على رف ظاهر أجهزة فيها صور وثائق هوية جاهزة للنسخ، والموظفات يدخلن المخزن باستمرار.",
+        likelihood: "very",
+        impact: "major",
+        why: "الدخول السهل متكرر والوثائق هويات. محتمل جدًا × كبيرة = شديد."
+      },
+      {
+        title: "تعريفات الحماية متأخرة في المختبر",
+        asset: "أجهزة التدريب",
+        text: "أجهزة مختبر البرمجة لم تُحدَّث تعريفات الحماية منذ شهرين. الأجهزة للتدريب ولا تحفظ ملفات موظفين. الإصابة ممكنة وقد توقف حصة، من دون تسريب أرشيف المؤسسة.",
+        likelihood: "possible",
+        impact: "moderate",
+        why: "الإصابة واردة، والأثر تعطيل تدريب لا فقد الأرشيف. محتمل × معتدلة = متوسط."
+      },
+      {
+        title: "عقود قديمة داخل غرفة مغلقة",
+        asset: "أسعار توريد قديمة تُستخدم للمقارنة",
+        text: "غرفة الأرشيف تُفتح ببطاقة ورقم سري، والدخول يُسجَّل، وآخر مراجعة بلا مخالفات. داخلها عقود توريد منتهية فيها أسعار ما زالت تُستخدم للمقارنة عند الشراء، بلا أرقام حسابات بنكية. الاطلاع غير المصرح نادر.",
+        likelihood: "unlikely",
+        impact: "moderate",
+        why: "الأسعار ما زالت مفيدة لو قُرئت فالأثر معتدل، والضوابط تجعل الاحتمال ضعيفًا. غير محتمل × معتدلة = منخفض."
+      },
+      {
+        title: "سجل الغياب قابل للتعديل",
+        asset: "سجل الحضور المعتمد",
+        text: "تطبيق الغياب الداخلي يحفظ السجل في ملف تستطيع المعلمة تعديله إذا استُخدمت ثغرة معروفة لم تُغلق. الاستغلال ممكن خلال الفصل، وتغيير السجل يغيّر اعتماد الحضور.",
+        likelihood: "possible",
+        impact: "major",
+        why: "الثغرة معروفة فالاستغلال محتمل، والأثر يمس سجلًا رسميًا. محتمل × كبيرة = مرتفع."
+      },
+      {
+        title: "شبكة لاسلكية قديمة لكنها معزولة",
+        asset: "تصفح الأجهزة في غرفة المعلمات",
+        text: "في غرفة المعلمات نقطة وصول قديمة بتشفير WPA2، وكلمة المرور على ورقة في الدرج. الشبكة مفصولة عن الخوادم. يمكن التنصت على تصفح الأجهزة المتصلة، ولا مسار إلى سجلات المؤسسة.",
+        likelihood: "possible",
+        impact: "moderate",
+        why: "الورقة في الدرج تجعل الدخول محتملًا، والعزل يمنع الوصول للسجلات فالأثر معتدل. محتمل × معتدلة = متوسط."
+      },
+      {
+        title: "هواتف شخصية تُقفل وحدها",
+        asset: "هاتف شخصي بلا تطبيقات عمل",
+        text: "تضع الموظفات هواتفهن الشخصية على المكتب في كل اجتماع. الشاشة تُقفل خلال ثلاثين ثانية، ولا تطبيقات عمل ولا بريد مؤسسي على الجهاز.",
+        likelihood: "very",
+        impact: "minor",
+        why: "الوضع يومي، والقفل السريع وغياب بيانات العمل يُبقيان الأثر طفيفًا. محتمل جدًا × طفيفة = متوسط."
+      },
+      {
+        title: "انقطاع الخط الرئيسي والخط البديل معًا",
+        asset: "امتحان إلكتروني في يوم واحد",
+        text: "الاتصال يعتمد على خط رئيسي وخط بديل يُختبر كل شهر، وآخر اختبار نجح. سجل خمس سنوات بلا انقطاع للخطين معًا. لو توقفا في يوم امتحان إلكتروني لتوقف الاختبار ذلك اليوم.",
+        likelihood: "unlikely",
+        impact: "major",
+        why: "توقف امتحان المؤسسة ذلك اليوم أثر كبير، والخط البديل المختبَر يُبقي الاحتمال ضعيفًا. غير محتمل × كبيرة = متوسط."
+      },
+      {
+        title: "شاشة تعرض برنامج حصص منشورًا أصلًا",
+        asset: "برنامج الحصص العام",
+        text: "شاشة مثبتة في الممر تعرض برنامج الحصص المنشور أصلًا على لوحة الإعلانات. غير موصولة بالشبكة الداخلية. تغيير العرض عبثًا غير مرجح لأنها مرتفعة ومقفلة.",
+        likelihood: "unlikely",
+        impact: "minor",
+        why: "المحتوى عام، والعبث نادر، وأثره إزعاج قصير. غير محتمل × طفيفة = منخفض."
+      },
+      {
+        title: "غلاف مادة يُترك على الطابعة",
+        asset: "ورقة باسم المادة فقط",
+        text: "طابعة المختبر تُخرج أحيانًا ورقة غلاف فيها اسم المادة فقط، وتبقى في الدرج دقائق. لا درجات ولا أسماء طالبات على الورقة.",
+        likelihood: "possible",
+        impact: "minor",
+        why: "الترك ممكن، والورقة بلا بيانات شخصية. محتمل × طفيفة = منخفض."
+      }
+    ];
+
+    QUESTIONS.forEach((q, i) => {
+      const tone = MATRIX[q.likelihood] && MATRIX[q.likelihood][q.impact];
+      if (!tone) throw new Error("سؤال ناقص: " + (i + 1));
+      q.severity = tone;
+      q.n = i + 1;
+    });
+
+    const STORE = "btec-u11-risk-exam-v1";
+    const emptyAnswer = () => ({ likelihood: null, impact: null, severity: null });
+
+    const state = {
+      screen: "intro",
+      name: "",
+      index: 0,
+      answers: QUESTIONS.map(emptyAnswer),
+      missesOnly: false,
+      confirm: false,
+      jump: false
+    };
+
+    function load() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORE) || "null");
+        if (!saved || !Array.isArray(saved.answers) || saved.answers.length !== QUESTIONS.length) return;
+        state.screen = saved.screen || "intro";
+        state.name = saved.name || "";
+        state.index = Number(saved.index) || 0;
+        state.answers = saved.answers.map((a) => Object.assign(emptyAnswer(), a));
+        state.missesOnly = Boolean(saved.missesOnly);
+      } catch (err) { /* جلسة جديدة */ }
+    }
+
+    function save() {
+      localStorage.setItem(STORE, JSON.stringify({
+        screen: state.screen,
+        name: state.name,
+        index: state.index,
+        answers: state.answers,
+        missesOnly: state.missesOnly
+      }));
+    }
+
+    function label(group, id) {
+      const list = group === "likelihood" ? LIKELIHOODS : group === "impact" ? IMPACTS : SEVERITIES;
+      const found = list.find((item) => item.id === id);
+      return found ? found.ar : "—";
+    }
+
+    function filled(answer) {
+      return Boolean(answer && answer.likelihood && answer.impact && answer.severity);
+    }
+
+    function doneCount() {
+      return state.answers.filter(filled).length;
+    }
+
+    function firstGap() {
+      return state.answers.findIndex((a) => !filled(a));
+    }
+
+    function scoreOf(answer, q) {
+      if (!filled(answer)) return { points: 0, ok: { likelihood: false, impact: false, severity: false }, perfect: false };
+      const ok = {
+        likelihood: answer.likelihood === q.likelihood,
+        impact: answer.impact === q.impact,
+        severity: answer.severity === q.severity
+      };
+      const points = (ok.likelihood ? 10 : 0) + (ok.impact ? 10 : 0) + (ok.severity ? 10 : 0);
+      return { points, ok, perfect: points === 30 };
+    }
+
+    function totals() {
+      return QUESTIONS.reduce((sum, q, i) => {
+        const row = scoreOf(state.answers[i], q);
+        sum.points += row.points;
+        if (row.perfect) sum.perfect += 1;
+        return sum;
+      }, { points: 0, perfect: 0 });
+    }
+
+    function choiceButtons(group, items, answer, locked) {
+      const q = QUESTIONS[state.index];
+      return items.map((item) => {
+        const selected = answer && answer[group] === item.id;
+        const correct = locked && q[group] === item.id;
+        const wrong = locked && selected && !correct;
+        const cls = correct
+          ? "border-emerald-300/80 bg-emerald-400/15"
+          : wrong
+            ? "border-rose-400/70 bg-rose-500/10"
+            : selected
+              ? "border-cyan-300/90 bg-cyan-400/15"
+              : "border-white/10 bg-white/[0.03] hover:border-cyan-300/40";
+        return `<button type="button" data-action="pick" data-group="${group}" data-value="${item.id}" aria-pressed="${selected ? "true" : "false"}" class="rounded-2xl border px-3 py-3 text-right ${cls} ${locked ? "pointer-events-none" : ""}">
+          <span class="block text-sm font-extrabold">${item.ar}</span>
+          <span class="num mt-0.5 block text-[11px] font-semibold text-slate-400">${item.en}</span>
+        </button>`;
+      }).join("");
+    }
+
+    function shell(inner) {
+      const answered = doneCount();
+      return `
+        <header class="no-print sticky top-0 z-20 -mx-4 mb-5 border-b border-white/10 bg-[#070b12]/85 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="text-[11px] font-bold text-cyan-300">BTEC · الوحدة 11 · امتحان</p>
+              <p class="text-sm font-extrabold">${state.name ? state.name : "تقييم المخاطر"}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="rounded-2xl border border-white/10 bg-white/5 px-3 py-1.5 text-center">
+                <p class="text-[10px] text-slate-400">${state.screen === "result" ? "المطابق" : "أُجيب"}</p>
+                <p class="num text-base font-black text-emerald-300">${state.screen === "result" ? totals().perfect : answered}<span class="text-[11px] text-slate-400"> / 15</span></p>
+              </div>
+            </div>
+          </div>
+        </header>
+        ${inner}`;
+    }
+
+    function introScreen() {
+      return shell(`
+        <main class="mx-auto grid max-w-3xl gap-4">
+          <section class="rise rounded-3xl border border-white/10 bg-slate-900/75 p-6 shadow-2xl">
+            <p class="text-xs font-bold text-emerald-200">خمس عشرة حالة جديدة</p>
+            <h1 class="mt-2 text-3xl font-black leading-snug">امتحان تقييم المخاطر</h1>
+            <p class="mt-3 text-sm leading-8 text-slate-300">كل سؤال حالة جديدة. حددي احتمالية الحدوث، وتأثير التهديد، وشدة المخاطر. الإجابة لا تظهر إلا بعد تسليم الامتحان كاملًا.</p>
+            <label class="mt-5 block text-sm font-extrabold" for="student-name">اسم الطالبة</label>
+            <input id="student-name" class="mt-2 w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-3 outline-none ring-cyan-300/40 focus:ring-2" placeholder="الاسم الثلاثي" value="${state.name.replace(/"/g, "")}" />
+            <button type="button" data-action="start" class="mt-4 rounded-2xl bg-gradient-to-l from-cyan-400 to-emerald-400 px-5 py-3 text-sm font-black text-slate-950">ابدئي الامتحان</button>
+          </section>
+        </main>`);
+    }
+
+    function examScreen() {
+      const q = QUESTIONS[state.index];
+      const answer = state.answers[state.index];
+      const ready = filled(answer);
+      const allReady = doneCount() === QUESTIONS.length;
+      const map = QUESTIONS.map((item, i) => {
+        const on = i === state.index;
+        const complete = filled(state.answers[i]);
+        const cls = on
+          ? "bg-cyan-300 text-slate-950"
+          : complete
+            ? "bg-emerald-400/80 text-slate-950"
+            : "bg-white/10 text-slate-300";
+        return `<button type="button" data-action="goto" data-index="${i}" class="num h-9 rounded-xl text-xs font-black ${cls}">${item.n}</button>`;
+      }).join("");
+      return shell(`
+        <main class="mx-auto grid max-w-3xl gap-4">
+          <article class="rounded-3xl border border-white/10 bg-slate-900/70 p-5 shadow-2xl">
+            <p class="text-[11px] font-bold text-cyan-200">السؤال <span class="num">${q.n}</span> من 15</p>
+            <h1 class="mt-2 text-2xl font-black leading-snug">${q.title}</h1>
+            <p class="mt-2 text-xs font-bold text-slate-400">الأصل: ${q.asset}</p>
+            <p class="mt-3 text-[15px] leading-8 text-slate-100">${q.text}</p>
+          </article>
+          <section class="rounded-3xl border border-white/10 bg-slate-900/55 p-4 sm:p-5">
+            <fieldset>
+              <legend class="mb-2 text-sm font-extrabold text-cyan-100">احتمالية الحدوث</legend>
+              <div class="grid gap-2 sm:grid-cols-3">${choiceButtons("likelihood", LIKELIHOODS, answer, false)}</div>
+            </fieldset>
+            <fieldset class="mt-4">
+              <legend class="mb-2 text-sm font-extrabold text-emerald-100">تأثير التهديد</legend>
+              <div class="grid gap-2 sm:grid-cols-3">${choiceButtons("impact", IMPACTS, answer, false)}</div>
+            </fieldset>
+            <fieldset class="mt-4">
+              <legend class="mb-2 text-sm font-extrabold text-amber-100">شدة المخاطر</legend>
+              <div class="grid gap-2 sm:grid-cols-4">${choiceButtons("severity", SEVERITIES, answer, false)}</div>
+            </fieldset>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button type="button" data-action="prev" ${state.index === 0 ? "disabled" : ""} class="rounded-2xl border border-white/15 px-4 py-3 text-sm font-bold disabled:opacity-40">السابق</button>
+              ${state.index < QUESTIONS.length - 1
+                ? `<button type="button" data-action="next" ${ready ? "" : "disabled"} class="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:bg-white/20 disabled:text-white/50">التالي</button>`
+                : `<button type="button" data-action="ask-submit" ${allReady ? "" : "disabled"} class="rounded-2xl bg-gradient-to-l from-cyan-400 to-emerald-400 px-4 py-3 text-sm font-black text-slate-950 disabled:opacity-40">تسليم الامتحان</button>`}
+            </div>
+            </section>
+          <nav class="no-print grid grid-cols-8 gap-1.5 rounded-3xl border border-white/10 bg-slate-900/40 p-3" aria-label="خريطة الأسئلة">${map}</nav>
+        </main>
+        ${state.confirm ? `
+          <div class="fixed inset-0 z-40 grid place-items-center bg-black/60 px-4">
+            <div class="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-5">
+              <h3 class="text-lg font-extrabold">تسليم الامتحان؟</h3>
+              <p class="mt-2 text-sm leading-7 text-slate-300">بعد التسليم تُقفل الإجابات وتظهر النتيجة مع سبب كل سؤال.</p>
+              <div class="mt-4 flex gap-2">
+                <button type="button" data-action="submit" class="flex-1 rounded-2xl bg-emerald-400 px-3 py-2.5 text-sm font-black text-slate-950">تسليم</button>
+                <button type="button" data-action="cancel" class="flex-1 rounded-2xl border border-white/15 px-3 py-2.5 text-sm font-bold">رجوع</button>
+              </div>
+            </div>
+          </div>` : ""}`);
+    }
+
+    function resultScreen() {
+      const sum = totals();
+      const band = sum.perfect >= 13 ? "متميز" : sum.perfect >= 10 ? "جيد جدًا" : sum.perfect >= 8 ? "جيد" : "يحتاج مراجعة";
+      const rows = QUESTIONS.map((q, i) => {
+        const answer = state.answers[i];
+        const row = scoreOf(answer, q);
+        if (state.missesOnly && row.perfect) return "";
+        return `<li class="print-sheet rounded-2xl border border-white/10 bg-black/20 p-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-[11px] text-slate-400">سؤال <span class="num">${q.n}</span></p>
+              <p class="font-extrabold">${q.title}</p>
+              <p class="mt-1 text-xs leading-6 text-slate-300">اختيارك: ${label("likelihood", answer.likelihood)} × ${label("impact", answer.impact)} ← ${label("severity", answer.severity)}</p>
+              <p class="text-xs leading-6 text-emerald-100">الإجابة: ${label("likelihood", q.likelihood)} × ${label("impact", q.impact)} ← ${label("severity", q.severity)}</p>
+              <p class="mt-1 text-sm leading-7 text-slate-200">${q.why}</p>
+            </div>
+            <span class="cell compact tone-${q.severity} rounded-xl px-2 py-1 text-[11px] font-extrabold">${row.perfect ? "مطابق" : row.points + "/30"}</span>
+          </div>
+        </li>`;
+      }).join("");
+      return shell(`
+        <main class="mx-auto grid max-w-3xl gap-4">
+          <section class="rise rounded-3xl border border-white/10 bg-slate-900/75 p-6 text-center">
+            <p class="text-xs font-bold text-cyan-300">${state.name}</p>
+            <h1 class="mt-2 text-3xl font-black">${band}</h1>
+            <p class="num mt-3 text-5xl font-black text-emerald-300">${sum.perfect}<span class="text-lg text-slate-400"> / 15</span></p>
+            <p class="mt-1 text-sm text-slate-300">حالات مطابقة بالكامل · النقاط <span class="num">${sum.points}</span> من 450</p>
+            <div class="no-print mt-5 flex flex-wrap justify-center gap-2">
+              <button type="button" data-action="toggle-misses" class="rounded-2xl border border-white/15 px-4 py-2 text-sm font-bold">${state.missesOnly ? "عرض كل الأسئلة" : "عرض غير المطابق"}</button>
+              <button type="button" data-action="print" class="rounded-2xl border border-white/15 px-4 py-2 text-sm font-bold">طباعة</button>
+              <button type="button" data-action="reset" class="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950">امتحان جديد</button>
+            </div>
+          </section>
+          <ol class="grid gap-2">${rows}</ol>
+        </main>`);
+    }
+
+    function render() {
+      const app = document.getElementById("app");
+      const html = state.screen === "exam" ? examScreen() : state.screen === "result" ? resultScreen() : introScreen();
+      app.innerHTML = html;
+      if (state.jump) {
+        state.jump = false;
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    }
+
+    document.getElementById("app").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-action]");
+      if (!button) return;
+      const action = button.dataset.action;
+      if (action === "start") {
+        const input = document.getElementById("student-name");
+        const name = (input && input.value || "").trim();
+        if (name.length < 2) {
+          input.focus();
+          input.classList.add("ring-2", "ring-rose-400");
+          return;
+        }
+        state.name = name;
+        state.screen = "exam";
+        state.index = 0;
+        state.answers = QUESTIONS.map(emptyAnswer);
+        state.confirm = false;
+        state.jump = true;
+        save();
+        render();
+      } else if (action === "pick" && state.screen === "exam") {
+        const group = button.dataset.group;
+        const value = button.dataset.value;
+        state.answers[state.index][group] = value;
+        save();
+        render();
+        const again = document.querySelector(`[data-group="${group}"][data-value="${value}"]`);
+        if (again) again.focus();
+      } else if (action === "next" && filled(state.answers[state.index])) {
+        state.index += 1;
+        state.jump = true;
+        save();
+        render();
+      } else if (action === "prev" && state.index > 0) {
+        state.index -= 1;
+        state.jump = true;
+        save();
+        render();
+      } else if (action === "goto") {
+        state.index = Number(button.dataset.index);
+        state.jump = true;
+        save();
+        render();
+      } else if (action === "ask-submit" && doneCount() === QUESTIONS.length) {
+        state.confirm = true;
+        render();
+      } else if (action === "cancel") {
+        state.confirm = false;
+        render();
+      } else if (action === "submit") {
+        state.confirm = false;
+        state.screen = "result";
+        state.missesOnly = false;
+        save();
+        render();
+      } else if (action === "toggle-misses") {
+        state.missesOnly = !state.missesOnly;
+        save();
+        render();
+      } else if (action === "print") {
+        window.print();
+      } else if (action === "reset") {
+        localStorage.removeItem(STORE);
+        state.screen = "intro";
+        state.name = "";
+        state.index = 0;
+        state.answers = QUESTIONS.map(emptyAnswer);
+        state.confirm = false;
+        state.missesOnly = false;
+        render();
+      }
+    });
+
+    load();
+    render();
+  </script>
+</body>
+</html>
