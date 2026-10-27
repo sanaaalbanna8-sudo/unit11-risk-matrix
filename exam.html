@@ -229,6 +229,7 @@
     });
 
     const STORE = "btec-u11-risk-exam-v1";
+    const SHEET_URL = "https://script.google.com/macros/s/AKfycbxFa5ANQ5DD4T81xTAoS89pWS4q3ZXYt2S0Uqw39a60_AgucTSuGyQxu_dx2daU9yx8Dw/exec";
     const emptyAnswer = () => ({ likelihood: null, impact: null, severity: null });
 
     const state = {
@@ -238,7 +239,8 @@
       answers: QUESTIONS.map(emptyAnswer),
       missesOnly: false,
       confirm: false,
-      jump: false
+      jump: false,
+      sheet: ""
     };
 
     function load() {
@@ -250,6 +252,7 @@
         state.index = Number(saved.index) || 0;
         state.answers = saved.answers.map((a) => Object.assign(emptyAnswer(), a));
         state.missesOnly = Boolean(saved.missesOnly);
+        state.sheet = saved.sheet === "sending" ? "error" : (saved.sheet || "");
       } catch (err) { /* جلسة جديدة */ }
     }
 
@@ -259,8 +262,51 @@
         name: state.name,
         index: state.index,
         answers: state.answers,
-        missesOnly: state.missesOnly
+        missesOnly: state.missesOnly,
+        sheet: state.sheet
       }));
+    }
+
+    function bandOf(perfect) {
+      return perfect >= 13 ? "متميز" : perfect >= 10 ? "جيد جدًا" : perfect >= 8 ? "جيد" : "يحتاج مراجعة";
+    }
+
+    function resultDetail() {
+      return QUESTIONS.map((q, i) => {
+        const answer = state.answers[i];
+        const row = scoreOf(answer, q);
+        if (row.perfect) return q.n + ":صح";
+        return q.n + ":" + label("likelihood", answer.likelihood) + "×" + label("impact", answer.impact) + "←" + label("severity", answer.severity);
+      }).join(" | ");
+    }
+
+    function sendResult() {
+      if (state.sheet === "sent" || state.sheet === "sending") return;
+      const sum = totals();
+      state.sheet = "sending";
+      save();
+      fetch(SHEET_URL, {
+        method: "POST",
+        mode: "no-cors",
+        cache: "no-store",
+        redirect: "follow",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          name: state.name,
+          perfect: sum.perfect,
+          points: sum.points,
+          band: bandOf(sum.perfect),
+          detail: resultDetail()
+        })
+      }).then(() => {
+        state.sheet = "sent";
+        save();
+        render();
+      }).catch(() => {
+        state.sheet = "error";
+        save();
+        render();
+      });
     }
 
     function label(group, id) {
@@ -415,7 +461,12 @@
 
     function resultScreen() {
       const sum = totals();
-      const band = sum.perfect >= 13 ? "متميز" : sum.perfect >= 10 ? "جيد جدًا" : sum.perfect >= 8 ? "جيد" : "يحتاج مراجعة";
+      const band = bandOf(sum.perfect);
+      const sheetNote = state.sheet === "sent"
+        ? `<p class="mt-2 text-sm font-bold text-emerald-200">حُفظت النتيجة عند المعلمة</p>`
+        : state.sheet === "error"
+          ? `<p class="mt-2 text-sm font-bold text-rose-200">ما انحفظت النتيجة. تحققي من الإنترنت ثم أعيدي الإرسال.</p>`
+          : `<p class="mt-2 text-sm font-bold text-slate-300">جاري حفظ النتيجة…</p>`;
       const rows = QUESTIONS.map((q, i) => {
         const answer = state.answers[i];
         const row = scoreOf(answer, q);
@@ -440,7 +491,9 @@
             <h1 class="mt-2 text-3xl font-black">${band}</h1>
             <p class="num mt-3 text-5xl font-black text-emerald-300">${sum.perfect}<span class="text-lg text-slate-400"> / 15</span></p>
             <p class="mt-1 text-sm text-slate-300">حالات مطابقة بالكامل · النقاط <span class="num">${sum.points}</span> من 450</p>
+            ${sheetNote}
             <div class="no-print mt-5 flex flex-wrap justify-center gap-2">
+              ${state.sheet === "error" ? `<button type="button" data-action="resend" class="rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-black text-slate-950">إعادة الإرسال</button>` : ""}
               <button type="button" data-action="toggle-misses" class="rounded-2xl border border-white/15 px-4 py-2 text-sm font-bold">${state.missesOnly ? "عرض كل الأسئلة" : "عرض غير المطابق"}</button>
               <button type="button" data-action="print" class="rounded-2xl border border-white/15 px-4 py-2 text-sm font-bold">طباعة</button>
               <button type="button" data-action="reset" class="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950">امتحان جديد</button>
@@ -476,6 +529,7 @@
         state.screen = "exam";
         state.index = 0;
         state.answers = QUESTIONS.map(emptyAnswer);
+        state.sheet = "";
         state.confirm = false;
         state.jump = true;
         save();
@@ -513,8 +567,15 @@
         state.confirm = false;
         state.screen = "result";
         state.missesOnly = false;
+        state.sheet = "";
         save();
         render();
+        sendResult();
+      } else if (action === "resend") {
+        state.sheet = "";
+        save();
+        render();
+        sendResult();
       } else if (action === "toggle-misses") {
         state.missesOnly = !state.missesOnly;
         save();
@@ -529,6 +590,7 @@
         state.answers = QUESTIONS.map(emptyAnswer);
         state.confirm = false;
         state.missesOnly = false;
+        state.sheet = "";
         render();
       }
     });
